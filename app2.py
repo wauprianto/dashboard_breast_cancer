@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.graph_objects as go
 
-# Konfigurasi Halaman
 st.set_page_config(page_title="Dashboard Regresi Logistik Pro", page_icon="🧬", layout="wide")
 
 # --- CSS Custom untuk Estetika ---
