@@ -4,7 +4,7 @@ import numpy as np
 import statsmodels.api as sm
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc
+from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc, classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.graph_objects as go
@@ -42,8 +42,10 @@ def load_data(file):
 
 try:
     df = load_data(uploaded_file)
+    # Transformasi variabel dependen biner: M = 1, B = 0
     df['target'] = df['diagnosis'].map({'M': 1, 'B': 0})
     
+    # 10 VARIABEL DENGAN AKHIRAN 'MEAN'
     fitur = [
         'radius_mean', 'texture_mean', 'perimeter_mean', 'area_mean', 
         'smoothness_mean', 'compactness_mean', 'concavity_mean', 
@@ -58,8 +60,29 @@ try:
     # ==========================================
     with tab1:
         st.header("📋 Deskripsi Dataset")
+        
+        # Menggunakan Expander agar UI lebih rapi
         with st.expander("Klik untuk membaca detail 10 Variabel 'Mean'", expanded=False):
-            st.markdown("*(Penjelasan variabel Anda tetap ada di sini...)*")
+            st.markdown("""
+            Dataset **Breast Cancer Wisconsin (Diagnostic)** ini berisi karakteristik visual dari inti sel massa pada jaringan payudara hasil biopsi.
+            Model ini mengevaluasi jaringan dengan pendekatan **Tendensi Sentral (Rata-rata / Mean)**. 
+            
+            #### 📏 Kelompok Ukuran Rata-rata (Size)
+            * **`radius_mean`:** Rata-rata jarak dari pusat inti sel ke batas terluarnya.
+            * **`perimeter_mean`:** Rata-rata panjang garis batas luar inti sel.
+            * **`area_mean`:** Rata-rata luas dimensi inti sel. 
+
+            #### 🧩 Kelompok Bentuk dan Kontur Tepi (Shape & Contour)
+            * **`smoothness_mean`:** Variasi rata-rata lokal dalam panjang jari-jari sel.
+            * **`compactness_mean`:** Seberapa padat sel-sel tersebut menempati ruang.
+            * **`concavity_mean`:** Rata-rata tingkat keparahan lekukan pada permukaan sel.
+            * **`concave points_mean`:** Rata-rata jumlah lekukan tajam per sel.
+            * **`symmetry_mean`:** Mengukur kecenderungan umum simetris tidaknya bentuk sel.
+            * **`fractal_dimension_mean`:** Kompleksitas rata-rata batas pinggiran sel.
+
+            #### 🎨 Kelompok Warna dan Tekstur (Texture)
+            * **`texture_mean`:** Rata-rata standar deviasi nilai piksel *grayscale*.
+            """)
         
         st.markdown("---")
         col1, col2 = st.columns([2, 1])
@@ -68,7 +91,9 @@ try:
             st.dataframe(df[['diagnosis'] + fitur].head(10), use_container_width=True)
         with col2:
             st.subheader("Distribusi Kelas")
-            st.bar_chart(df['diagnosis'].value_counts(), color=["#FF4B4B"]) 
+            distribusi = df['diagnosis'].value_counts()
+            # Kustomisasi warna bar chart
+            st.bar_chart(distribusi, color=["#FF4B4B"]) 
 
     # ==========================================
     # TAB 2: RINGKASAN MODEL STATISTIK & EVALUASI
@@ -86,10 +111,10 @@ try:
         
         # Penambahan fitur: Perbandingan Model dengan Scikit-Learn
         st.subheader("Perbandingan Performa Model")
-        model_choice = st.radio("Pilih Model untuk Metrik:", ["Logistic Regression (Statsmodels)", "Random Forest"], horizontal=True)
+        model_choice = st.radio("Pilih Model untuk Dievaluasi:", ["Logistic Regression (Statsmodels)", "Random Forest"], horizontal=True)
         
         if model_choice == "Random Forest":
-            clf = RandomForestClassifier().fit(df[fitur], y)
+            clf = RandomForestClassifier(random_state=42).fit(df[fitur], y)
             y_pred_new = clf.predict(df[fitur])
             y_prob_new = clf.predict_proba(df[fitur])[:, 1]
             akurasi = accuracy_score(y, y_pred_new)
@@ -102,21 +127,34 @@ try:
         m1, m2, m3, m4 = st.columns(4)
         m1.metric(label="Akurasi Model", value=f"{akurasi * 100:.2f}%")
         
-        # ROC Curve (Fitur Baru)
-        fpr, tpr, _ = roc_curve(y, y_prob_final)
-        fig_roc = go.Figure()
-        fig_roc.add_trace(go.Scatter(x=fpr, y=tpr, name=f'AUC = {auc(fpr, tpr):.2f}'))
-        fig_roc.add_shape(type='line', line=dict(dash='dash'), x0=0, x1=1, y0=0, y1=1)
-        st.plotly_chart(fig_roc, use_container_width=True)
+        col_roc, col_summary = st.columns([1, 1])
         
-        st.subheader("Tabel Summary Regresi Logistik")
-        st.text_area("Statsmodels Results", str(model_sm.summary()), height=300)
+        with col_roc:
+            # ROC Curve 
+            st.subheader("ROC Curve")
+            fpr, tpr, _ = roc_curve(y, y_prob_final)
+            fig_roc = go.Figure()
+            fig_roc.add_trace(go.Scatter(x=fpr, y=tpr, name=f'AUC = {auc(fpr, tpr):.2f}', line=dict(color='blue', width=2)))
+            fig_roc.add_shape(type='line', line=dict(dash='dash', color='gray'), x0=0, x1=1, y0=0, y1=1)
+            fig_roc.update_layout(xaxis_title="False Positive Rate", yaxis_title="True Positive Rate", margin=dict(l=20, r=20, t=20, b=20))
+            st.plotly_chart(fig_roc, use_container_width=True)
+        
+        with col_summary:
+            # Menampilkan Summary berdasarkan pilihan Model
+            if model_choice == "Logistic Regression (Statsmodels)":
+                st.subheader("Tabel Summary Regresi Logistik")
+                st.text_area("Statsmodels Results", str(model_sm.summary()), height=300)
+            else:
+                st.subheader("Classification Report Random Forest")
+                # Membuat format string agar rapi ditampilkan di text_area
+                report_str = classification_report(y, y_pred_new, target_names=['Benign (0)', 'Malignant (1)'])
+                st.text_area("Scikit-Learn Classification Report", report_str, height=300)
+                st.info("Catatan: Random Forest dari scikit-learn tidak menghasilkan P-value atau Standard Error seperti Statsmodels. Tabel di atas menampilkan metrik Precision, Recall, dan F1-Score.")
 
     # ==========================================
-    # TAB 3: KALKULATOR PREDIKSI (ASLI ANDA)
+    # TAB 3: KALKULATOR PREDIKSI INTERAKTIF
     # ==========================================
     with tab3:
-        # (Kode kalkulator slider Anda tetap di sini...)
         st.header("Simulasi Prediksi Real-Time")
         st.markdown("Sesuaikan parameter di bawah ini untuk melihat bagaimana probabilitas dihitung menggunakan fungsi sigmoid:")
         st.latex(r"P(Y=1) = \frac{1}{1 + e^{-Z}} \quad \text{dimana} \quad Z = \beta_0 + \beta_1X_1 + \dots + \beta_nX_n")
@@ -183,18 +221,18 @@ try:
             )
             st.plotly_chart(fig, use_container_width=True)
 
-except FileNotFoundError:
-    st.error("Gagal memuat data. Pastikan file 'data.csv' sudah diunggah di folder kerja yang sama dengan app.py.")
-
     # ==========================================
     # TAB 4: FEATURE IMPORTANCE (BARU)
     # ==========================================
     with tab4:
         st.header("Analisis Feature Importance")
-        model_rf = RandomForestClassifier().fit(df[fitur], y)
-        imp = pd.DataFrame({'Feature': fitur, 'Importance': model_rf.feature_importances_}).sort_values(by='Importance')
-        fig_imp, ax = plt.subplots()
-        ax.barh(imp['Feature'], imp['Importance'], color='skyblue')
+        st.markdown("Grafik ini menunjukkan fitur mana yang paling berpengaruh dalam memprediksi diagnosis (berdasarkan model Random Forest).")
+        model_rf = RandomForestClassifier(random_state=42).fit(df[fitur], y)
+        imp = pd.DataFrame({'Feature': [f.replace('_', ' ').title() for f in fitur], 'Importance': model_rf.feature_importances_}).sort_values(by='Importance')
+        fig_imp, ax = plt.subplots(figsize=(8, 5))
+        sns.barplot(x='Importance', y='Feature', data=imp, palette='viridis', ax=ax)
+        ax.set_xlabel('Tingkat Kepentingan (Importance)')
+        ax.set_ylabel('')
         st.pyplot(fig_imp)
 
     # ==========================================
@@ -203,10 +241,14 @@ except FileNotFoundError:
     with tab5:
         st.header("🧠 Technical Insights")
         st.markdown("""
-        * **Preprocessing:** Dilakukan drop pada kolom tidak relevan.
-        * **Evaluasi:** Menggunakan AUC-ROC untuk menilai kemampuan diskriminasi model pada data medis.
-        * **Insight:** Random Forest membantu mengidentifikasi fitur paling kritis tanpa asumsi linearitas.
+        * **Preprocessing:** Dilakukan pemetaan label diagnosis menjadi biner (M=1, B=0) dan penghapusan kolom yang tidak relevan.
+        * **Evaluasi:** Menggunakan **AUC-ROC (Area Under the Receiver Operating Characteristic Curve)** untuk menilai kemampuan diskriminasi model pada data medis, karena lebih andal daripada sekadar akurasi, terutama jika ada ketidakseimbangan kelas.
+        * **Perbandingan Model:** * **Regresi Logistik** memberikan pemahaman yang jelas tentang pengaruh setiap variabel melalui log-odds, sangat berguna untuk inferensi statistik.
+            * **Random Forest** sering kali memberikan akurasi yang lebih tinggi dengan mengidentifikasi pola non-linear tanpa memerlukan asumsi distribusi data yang ketat.
+        * **Insight:** Fitur terkait ukuran sel (seperti area, perimeter, dan radius) umumnya memiliki pengaruh yang kuat terhadap diagnosis.
         """)
 
+except FileNotFoundError:
+    st.error("Gagal memuat data. Pastikan file 'data.csv' sudah diunggah di folder kerja yang sama dengan app.py.")
 except Exception as e:
-    st.error(f"Error: {e}")
+    st.error(f"Terjadi kesalahan: {e}")
