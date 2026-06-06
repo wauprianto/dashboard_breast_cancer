@@ -13,7 +13,9 @@ Dashboard interaktif untuk menganalisis dan memprediksi diagnosis tumor payudara
  Scikit-Learn: Untuk implementasi model ML dan metrik evaluasi.
  Statsmodels: Untuk estimasi parameter statistik.
  Plotly & Seaborn: Untuk visualisasi data interaktif dan statis.
+ 
 ⚙️ Cara Menjalankan
 1. Pastikan Anda telah menginstal Python di komputer Anda.
 2. Clone repositori ini:
-git clone cd [nama-folder-proyek]
+git clone [https://github.com/wauprianto/Dashboard_breast_cancer]
+cd [nama-fol]
